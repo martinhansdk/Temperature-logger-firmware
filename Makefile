@@ -1,12 +1,5 @@
-ARDUINO_DIR = /usr/share/arduino
-AVR_TOOLS_PATH = /usr/bin
-AVRDUDE_CONF   = /etc/avrdude.conf
-
-TARGET       = logger
-MCU          = atmega168
-F_CPU        = 16000000
-ARDUINO_PORT = /dev/ttyUSB0
-
-ARDUINO_LIBS = Time TimeAlarms Wire EDB Messenger
-
-include ../Arduino.mk
+BOARD = diecimila
+PORT = /dev/ttyUSB0
+LIB_DIRS = ../libraries/EDB ../libraries/Time ../libraries/TimeAlarms ../libraries/Messenger $(ARD_LIBDIR)/Wire $(ARD_LIBDIR)/Wire/utility
+include ../Makefile.ubuntu
+include ../Makefile.master

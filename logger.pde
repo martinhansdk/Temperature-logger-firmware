@@ -23,6 +23,16 @@ int running = 0;
 time_t period = 60;
 AlarmId timer;
 
+// prototypes
+void sample_and_store();
+void greenLEDoff();
+void EEwriter(unsigned long address, byte data);
+byte EEreader(unsigned long address);
+void messageCompleted();
+void print_status();
+void i2c_eeprom_write_byte( int deviceaddress, unsigned int eeaddress, byte data );
+byte i2c_eeprom_read_byte( int deviceaddress, unsigned int eeaddress );
+
 // this is the record stored in the EEPROM
 struct LogEvent {
   time_t time;
