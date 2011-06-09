@@ -175,7 +175,7 @@ void messageCompleted() {
       long unsigned int count = db.count();
       Serial.print("records="); Serial.println(count);
       Serial.println("nr;timestamp;value");
-      for(long unsigned int i=0 ; i<count ; i++) {
+      for(long unsigned int i=1 ; i<count+1 ; i++) {
         db.readRec(i, EDB_REC logEvent);
         Serial.print(i); Serial.print(";"); Serial.print(logEvent.time); Serial.print(";"); Serial.println(logEvent.temperature);
       }
