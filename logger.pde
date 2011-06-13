@@ -17,6 +17,7 @@
 int sensorPin = 0;
 int greenLEDPin = 2; // set to 2 when using the logger shield
 int redLEDPin = 3;
+int doorPin = 4;
 
 // status information
 int running = 0;
@@ -37,6 +38,7 @@ byte i2c_eeprom_read_byte( int deviceaddress, unsigned int eeaddress );
 struct LogEvent {
   time_t time;
   int temperature;
+  byte door;
 } 
 logEvent;
 
@@ -59,6 +61,11 @@ void setup() {
   digitalWrite(greenLEDPin, LOW);
   digitalWrite(redLEDPin, LOW);
   
+  // setup door status pin
+  pinMode(doorPin, INPUT);
+  digitalWrite(doorPin, HIGH); // enable pullup resistor
+
+
   // use external reference
   analogReference(EXTERNAL);
 
@@ -91,6 +98,7 @@ void loop () {
 
 void sample_and_store () {
   logEvent.temperature = analogRead(sensorPin);
+  logEvent.door = digitalRead(doorPin);
   logEvent.time = now();
   last_db_status=db.appendRec(EDB_REC logEvent);  
   
@@ -174,10 +182,11 @@ void messageCompleted() {
     } else if ( message.checkString("getdata") ) {
       long unsigned int count = db.count();
       Serial.print("records="); Serial.println(count);
-      Serial.println("nr;timestamp;value");
+      Serial.println("nr;timestamp;value;door");
       for(long unsigned int i=1 ; i<count+1 ; i++) {
         db.readRec(i, EDB_REC logEvent);
-        Serial.print(i); Serial.print(";"); Serial.print(logEvent.time); Serial.print(";"); Serial.println(logEvent.temperature);
+        Serial.print(i); Serial.print(";"); Serial.print(logEvent.time); Serial.print(";"); Serial.print(logEvent.temperature);Serial.print(";"); Serial.print(logEvent.door);
+	Serial.println();
       }
       
       // don't print the status
