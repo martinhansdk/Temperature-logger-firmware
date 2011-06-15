@@ -34,13 +34,24 @@ void print_status();
 void i2c_eeprom_write_byte( int deviceaddress, unsigned int eeaddress, byte data );
 byte i2c_eeprom_read_byte( int deviceaddress, unsigned int eeaddress );
 
-// this is the record stored in the EEPROM
+// this is the recorded data
 struct LogEvent {
   time_t time;
-  int temperature;
-  byte door;
+  int temperature_indoor;
+  int temperature_outdoor;
+  byte door_open;
 } 
 logEvent;
+
+// this is the data actually stored in the EEPROM
+// it exploits the fact that we only need
+//   XX bits for the time
+//   XX bits for the temperature readings
+//    1 bit for the door
+// total: XX bytes
+struct PackedLogEvent {
+  byte data[4];
+}
 
 
 // Create an EDB object with the appropriate write and read handlers
@@ -239,4 +250,31 @@ byte i2c_eeprom_read_byte( int deviceaddress, unsigned int eeaddress ) {
   Wire.requestFrom(deviceaddress,1);
   if (Wire.available()) rdata = Wire.receive();
   return rdata;
+}
+
+#define TIME_OFFSET 0
+#define TEMPERATURE_INDOOR_OFFSET 10
+#define TEMPERATURE_OUTDOOR_OFFSET 20
+#define DOOR_OPEN_OFFSET 30
+
+struct PackedLogEvent pack(struct LogEvent event) {
+  uint64_t data; // big integer to ease translation
+  struct PackedLogEvent packed;
+
+  data = 0;
+  data |= event.time                << TIME_OFFSET;
+  data |= event.temperature_indoor  << TEMPERATURE_INDOOR_OFFSET;
+  data |= event.temperature_outdoor << TEMPERATURE_OUTDOOR_OFFSET;
+  data |= event.door_open           << DOOR_OPEN_OFFSET;
+
+  packed.data[0] = (byte)data;
+  packed.data[1] = (byte)(data >> 8);
+  packed.data[2] = (byte)(data >> 16);
+  packed.data[3] = (byte)(data >> 24);
+
+  return packed;
+}
+
+struct LogEvent unpack(struct PackedLogEvent event) {
+  // FIXME
 }
