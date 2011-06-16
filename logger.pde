@@ -10,7 +10,7 @@
 #include <Wire.h>
 #include <EDB.h>
 #include <Messenger.h>
-
+#include "logevent.h"
 
 
 // pins
@@ -33,26 +33,6 @@ void messageCompleted();
 void print_status();
 void i2c_eeprom_write_byte( int deviceaddress, unsigned int eeaddress, byte data );
 byte i2c_eeprom_read_byte( int deviceaddress, unsigned int eeaddress );
-
-// this is the recorded data
-struct LogEvent {
-  time_t time;
-  int temperature_indoor;
-  int temperature_outdoor;
-  byte door_open;
-} 
-logEvent;
-
-// this is the data actually stored in the EEPROM
-// it exploits the fact that we only need
-//   XX bits for the time
-//   XX bits for the temperature readings
-//    1 bit for the door
-// total: XX bytes
-struct PackedLogEvent {
-  byte data[4];
-}
-
 
 // Create an EDB object with the appropriate write and read handlers
 #define TABLE_SIZE 65536
@@ -108,10 +88,11 @@ void loop () {
 
 
 void sample_and_store () {
+  LogEvent logEvent;
   logEvent.temperature = analogRead(sensorPin);
   logEvent.door = digitalRead(doorPin);
   logEvent.time = now();
-  last_db_status=db.appendRec(EDB_REC logEvent);  
+  last_db_status=db.appendRec(EDB_REC logEvent.pack());  
   
   // turn green led on for one second to show sampling happened
   digitalWrite(greenLEDPin, HIGH);
@@ -168,7 +149,7 @@ void messageCompleted() {
       setTime(newtime);
       Serial.println("OK");
     } else if ( message.checkString("initdb") ) {
-      last_db_status=db.create(0, TABLE_SIZE, sizeof(logEvent)); 
+      last_db_status=db.create(0, TABLE_SIZE, sizeof(PackedLogEvent)); 
       Serial.println("OK");     
     } else if ( message.checkString("cleardb") ) {
       db.clear();
@@ -191,11 +172,15 @@ void messageCompleted() {
         
       Serial.println("OK");      
     } else if ( message.checkString("getdata") ) {
+      LogEvent logEvent;
+      PackedLogevent packedLogEvent;
+
       long unsigned int count = db.count();
       Serial.print("records="); Serial.println(count);
       Serial.println("nr;timestamp;value;door");
       for(long unsigned int i=1 ; i<count+1 ; i++) {
-        db.readRec(i, EDB_REC logEvent);
+        db.readRec(i, EDB_REC packedLogEvent);
+	logEvent = packedLogEevent.unpack();
         Serial.print(i); Serial.print(";"); Serial.print(logEvent.time); Serial.print(";"); Serial.print(logEvent.temperature);Serial.print(";"); Serial.print(logEvent.door);
 	Serial.println();
       }
@@ -252,29 +237,3 @@ byte i2c_eeprom_read_byte( int deviceaddress, unsigned int eeaddress ) {
   return rdata;
 }
 
-#define TIME_OFFSET 0
-#define TEMPERATURE_INDOOR_OFFSET 10
-#define TEMPERATURE_OUTDOOR_OFFSET 20
-#define DOOR_OPEN_OFFSET 30
-
-struct PackedLogEvent pack(struct LogEvent event) {
-  uint64_t data; // big integer to ease translation
-  struct PackedLogEvent packed;
-
-  data = 0;
-  data |= event.time                << TIME_OFFSET;
-  data |= event.temperature_indoor  << TEMPERATURE_INDOOR_OFFSET;
-  data |= event.temperature_outdoor << TEMPERATURE_OUTDOOR_OFFSET;
-  data |= event.door_open           << DOOR_OPEN_OFFSET;
-
-  packed.data[0] = (byte)data;
-  packed.data[1] = (byte)(data >> 8);
-  packed.data[2] = (byte)(data >> 16);
-  packed.data[3] = (byte)(data >> 24);
-
-  return packed;
-}
-
-struct LogEvent unpack(struct PackedLogEvent event) {
-  // FIXME
-}
