@@ -54,8 +54,7 @@ string convBase(uint64_t v, long base)
 }
 
 ::std::ostream& operator<<(::std::ostream& os, const LogEvent& event) {
-  return os << "time=" << event.time 
-	    << " t_indoor=" << event.temperature_indoor
+  return os << " t_indoor=" << event.temperature_indoor
             << " t_outdoor=" << event.temperature_outdoor 
 	    << " door_open=" << (int)event.door_open;
   }
@@ -76,23 +75,19 @@ string convBase(uint64_t v, long base)
 TEST_F(LoggerTest, packing_and_unpacking_works) {
   LogEvent a;
 
-  a.time = 0xffffffff;
   a.temperature_indoor = 0;
   a.temperature_outdoor = 0x3ff;
   a.door_open = 0;
 
-  /*
+  
   cout << "big_size=" << sizeof(uint64_t) << endl;
-  cout << "time_mask=" << setw(64) << right << convBase(((uint64_t)PackedLogEvent::TIME_MASK) << PackedLogEvent::TIME_OFFSET, 2) << endl;
   cout << "tin_mask= "  << setw(64) << right << convBase(((uint64_t)PackedLogEvent::TEMPERATURE_INDOOR_MASK) << PackedLogEvent::TEMPERATURE_INDOOR_OFFSET, 2) << endl;
   cout << "tout_mask=" << setw(64) << right << convBase(((uint64_t)PackedLogEvent::TEMPERATURE_OUTDOOR_MASK) << PackedLogEvent::TEMPERATURE_OUTDOOR_OFFSET, 2) << endl;
   cout << "door_mask=" << setw(64) << right << convBase(((uint64_t)PackedLogEvent::DOOR_OPEN_MASK) << PackedLogEvent::DOOR_OPEN_OFFSET, 2) << endl;
 
-  cout << "b=" << ::testing::PrintToString(b) << endl;
-  */
+  
   EXPECT_EQ(a, a.pack().unpack());
 
-  a.time = 0;
   a.temperature_indoor = 0x3ff;
   a.temperature_outdoor = 0;
   a.door_open = 1;
@@ -101,11 +96,10 @@ TEST_F(LoggerTest, packing_and_unpacking_works) {
 
   // random testing
   for(int i=0; i<10000; i++) {
-    a.time = rand();
-    a.temperature_indoor = rand() % (1 << 10);
-    a.temperature_outdoor = rand() % (1 << 10);
+    a.temperature_indoor = rand() % (1 << 11);
+    a.temperature_outdoor = rand() % (1 << 11);
     a.door_open = rand() % 2;
-    EXPECT_EQ(a, a.pack().unpack());
+    ASSERT_EQ(a, a.pack().unpack());
   }
 }
 

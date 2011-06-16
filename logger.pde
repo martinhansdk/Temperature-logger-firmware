@@ -10,11 +10,11 @@
 #include <Wire.h>
 #include <EDB.h>
 #include <Messenger.h>
+#include <DS1621.h>
 #include "logevent.h"
 
 
 // pins
-int sensorPin = 0;
 int greenLEDPin = 2; // set to 2 when using the logger shield
 int redLEDPin = 3;
 int doorPin = 4;
@@ -23,6 +23,10 @@ int doorPin = 4;
 int running = 0;
 time_t period = 60;
 AlarmId timer;
+
+// temperature sensors
+DS1621 indoor_sensor  = DS1621((0x90 >> 1) | 0);
+DS1621 outdoor_sensor = DS1621((0x90 >> 1) | 1);
 
 // prototypes
 void sample_and_store();
@@ -33,11 +37,14 @@ void messageCompleted();
 void print_status();
 void i2c_eeprom_write_byte( int deviceaddress, unsigned int eeaddress, byte data );
 byte i2c_eeprom_read_byte( int deviceaddress, unsigned int eeaddress );
+int truncate_temp(int tC);
+int untruncate_temp(int tC);
+void print_hr_temperature(int tC);
 
 // Create an EDB object with the appropriate write and read handlers
 #define TABLE_SIZE 65536
 EDB db(&EEwriter, &EEreader);
-EDB_Status last_db_status = EDB_Status(255);
+EDB_Status last_db_status = EDB_Status(100);
 
 // Instantiate Messenger object with the message function and the default separator (the space character)
 #define MAXSIZE 30 
@@ -56,9 +63,13 @@ void setup() {
   pinMode(doorPin, INPUT);
   digitalWrite(doorPin, HIGH); // enable pullup resistor
 
+  // configure temperature sensors
+  indoor_sensor.startConversion(false);         // stop if presently set to continuous
+  indoor_sensor.setConfig(DS1621::ONE_SHOT);    // 1-shot mode
 
-  // use external reference
-  analogReference(EXTERNAL);
+  outdoor_sensor.startConversion(false);        // stop if presently set to continuous
+  outdoor_sensor.setConfig(DS1621::ONE_SHOT);   // 1-shot mode
+  
 
   // setup logging
   timer = Alarm.timerRepeat(period, sample_and_store);
@@ -73,6 +84,8 @@ void setup() {
 
   // initalize data storage
   last_db_status=db.open(0); 
+
+  Serial.println("started");
 }
 
 
@@ -88,11 +101,13 @@ void loop () {
 
 
 void sample_and_store () {
-  LogEvent logEvent;
-  logEvent.temperature = analogRead(sensorPin);
-  logEvent.door = digitalRead(doorPin);
-  logEvent.time = now();
-  last_db_status=db.appendRec(EDB_REC logEvent.pack());  
+  LogEvent logEvent;  
+
+  logEvent.temperature_indoor  = truncate_temp(indoor_sensor.getHrTemp());
+  logEvent.temperature_outdoor = truncate_temp(outdoor_sensor.getHrTemp());
+  logEvent.door_open = digitalRead(doorPin);
+
+  last_db_status=db.appendRec(EDB_REC logEvent.pack()); 
   
   // turn green led on for one second to show sampling happened
   digitalWrite(greenLEDPin, HIGH);
@@ -173,15 +188,18 @@ void messageCompleted() {
       Serial.println("OK");      
     } else if ( message.checkString("getdata") ) {
       LogEvent logEvent;
-      PackedLogevent packedLogEvent;
+      PackedLogEvent packedLogEvent;
 
       long unsigned int count = db.count();
       Serial.print("records="); Serial.println(count);
-      Serial.println("nr;timestamp;value;door");
+      Serial.println("nr;temperature_indoor;temperature_outdoor;door");
       for(long unsigned int i=1 ; i<count+1 ; i++) {
         db.readRec(i, EDB_REC packedLogEvent);
-	logEvent = packedLogEevent.unpack();
-        Serial.print(i); Serial.print(";"); Serial.print(logEvent.time); Serial.print(";"); Serial.print(logEvent.temperature);Serial.print(";"); Serial.print(logEvent.door);
+	logEvent = packedLogEvent.unpack();
+        Serial.print(i); 
+	Serial.print(";"); print_hr_temperature(untruncate_temp(logEvent.temperature_indoor));
+	Serial.print(";"); print_hr_temperature(untruncate_temp(logEvent.temperature_outdoor));
+	Serial.print(";"); Serial.print(logEvent.door_open);
 	Serial.println();
       }
       
@@ -204,14 +222,44 @@ void print_status() {
   Serial.print("Database entries: "); Serial.print(db.count(), DEC); Serial.print(" out of a maximum of "); Serial.println(db.limit(), DEC);
   Serial.print("Last db status: "); 
   switch(last_db_status) {
-     case 255: Serial.println("none"); break;
+     case 100: Serial.println("none"); break;
      case EDB_OK: Serial.println("OK"); break;
      case EDB_OUT_OF_RANGE: Serial.println("out of range"); break;
      case EDB_TABLE_FULL: Serial.println("table full"); break;
      default: Serial.println("unknown");
   }
-  Serial.print("Sensor value: "); Serial.println(analogRead(sensorPin));
+  Serial.print("Indoor temperature: "); print_hr_temperature(indoor_sensor.getHrTemp());
+  Serial.print("Outdoor temperature: "); print_hr_temperature(outdoor_sensor.getHrTemp());
+  Serial.print("Door open: "); Serial.println(digitalRead(doorPin));
 }
+
+// the temperature is stored in the EEPROM with a resolution of 11 bits
+// but the DS1621 delivers an integer where 
+int truncate_temp(int tC) {
+  return tC >> 5;
+}
+
+int untruncate_temp(int tC) {
+  return tC << 5;
+}
+
+
+void print_hr_temperature(int tC) {
+  if (tC < 0) {
+    tC = -tC;                                   // fix for integer division
+    Serial.print("-");                          // indicate negative
+  }
+  
+  int tFrac = tC % 100;                             // extract fractional part
+  tC /= 100;                                    // extract whole part
+  
+  Serial.print(tC);
+  Serial.print(".");
+  if (tFrac < 10)
+    Serial.print("0");
+  Serial.println(tFrac);
+}
+
 
 //----------------- low level functions for talking to the AT24C256 eeproms
 
