@@ -62,7 +62,10 @@ void setup() {
   // setup door status pin
   pinMode(doorPin, INPUT);
   digitalWrite(doorPin, HIGH); // enable pullup resistor
-
+  
+  // initialize I2C master
+  Wire.begin();
+  
   // configure temperature sensors
   indoor_sensor.startConversion(false);         // stop if presently set to continuous
   indoor_sensor.setConfig(DS1621::ONE_SHOT);    // 1-shot mode
@@ -78,9 +81,6 @@ void setup() {
   // initialize serial communication:
   Serial.begin(9600);
   message.attach(messageCompleted);
-  
-  // initialize I2C master
-  Wire.begin();
 
   // initalize data storage
   last_db_status=db.open(0); 
