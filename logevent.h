@@ -1,3 +1,6 @@
+#ifndef LOGEVENT_H
+#define LOGEVENT_H
+
 #include <stdint.h>
 
 class PackedLogEvent;
@@ -44,4 +47,4 @@ class PackedLogEvent {
   LogEvent unpack();
 };
 
-
+#endif

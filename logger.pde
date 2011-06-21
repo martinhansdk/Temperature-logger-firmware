@@ -12,37 +12,34 @@
 #include <Messenger.h>
 #include <DS1621.h>
 #include "logevent.h"
-
+#include "eeprom.h"
 
 // pins
 int greenLEDPin = 2; // set to 2 when using the logger shield
 int redLEDPin = 3;
-int doorPin = 4;
+int doorPin = 12;
 
 // status information
 int running = 0;
-time_t period = 60;
+time_t period = 30;
 AlarmId timer;
 
 // temperature sensors
-DS1621 indoor_sensor  = DS1621((0x90 >> 1) | 0);
-DS1621 outdoor_sensor = DS1621((0x90 >> 1) | 1);
+DS1621 indoor_sensor  = DS1621((0x90 >> 1) | 1);
+DS1621 outdoor_sensor = DS1621((0x90 >> 1) | 0);
 
 // prototypes
 void sample_and_store();
 void greenLEDoff();
-void EEwriter(unsigned long address, byte data);
-byte EEreader(unsigned long address);
 void messageCompleted();
 void print_status();
-void i2c_eeprom_write_byte( int deviceaddress, unsigned int eeaddress, byte data );
-byte i2c_eeprom_read_byte( int deviceaddress, unsigned int eeaddress );
 int truncate_temp(int tC);
 int untruncate_temp(int tC);
 void print_hr_temperature(int tC);
 
 // Create an EDB object with the appropriate write and read handlers
-#define TABLE_SIZE 65536
+// Each eeprom has space for 32768 bytes, we've got 4 of them 
+#define TABLE_SIZE 32768*4
 EDB db(&EEwriter, &EEreader);
 EDB_Status last_db_status = EDB_Status(100);
 
@@ -124,34 +121,6 @@ void greenLEDoff () {
    digitalWrite(greenLEDPin, LOW);
 }
 
-// The read and write handlers for the database
-// we have two EEPROMs on the board
-void EEwriter(unsigned long address, byte data)
-{
-  int deviceaddress;
-  if(address < 32768) {
-    deviceaddress=0x50;
-  } else {
-    deviceaddress=0x52;
-    address=address-32768; 
-  }
-      
-  i2c_eeprom_write_byte( deviceaddress, address, data );
-}
-
-byte EEreader(unsigned long address)
-{
-  int deviceaddress;
-  if(address < 32768) {
-    deviceaddress=0x50;
-  } else {
-    deviceaddress=0x52;
-    address=address-32768; 
-  }
-      
-  return i2c_eeprom_read_byte( deviceaddress, address );
-}
-
 // Define messenger function
 void messageCompleted() {
    
@@ -199,7 +168,7 @@ void messageCompleted() {
         Serial.print(i); 
 	Serial.print(";"); print_hr_temperature(untruncate_temp(logEvent.temperature_indoor));
 	Serial.print(";"); print_hr_temperature(untruncate_temp(logEvent.temperature_outdoor));
-	Serial.print(";"); Serial.print(logEvent.door_open);
+	Serial.print(";"); Serial.print((int)logEvent.door_open);
 	Serial.println();
       }
       
@@ -228,8 +197,8 @@ void print_status() {
      case EDB_TABLE_FULL: Serial.println("table full"); break;
      default: Serial.println("unknown");
   }
-  Serial.print("Indoor temperature: "); print_hr_temperature(indoor_sensor.getHrTemp());
-  Serial.print("Outdoor temperature: "); print_hr_temperature(outdoor_sensor.getHrTemp());
+  Serial.print("Indoor temperature: "); print_hr_temperature(indoor_sensor.getHrTemp()); Serial.println();
+  Serial.print("Outdoor temperature: "); print_hr_temperature(outdoor_sensor.getHrTemp()); Serial.println();
   Serial.print("Door open: "); Serial.println(digitalRead(doorPin));
 }
 
@@ -257,31 +226,6 @@ void print_hr_temperature(int tC) {
   Serial.print(".");
   if (tFrac < 10)
     Serial.print("0");
-  Serial.println(tFrac);
-}
-
-
-//----------------- low level functions for talking to the AT24C256 eeproms
-
-void i2c_eeprom_write_byte( int deviceaddress, unsigned int eeaddress, byte data ) {
-  int rdata = data;
-  Wire.beginTransmission(deviceaddress);
-  Wire.send((int)(eeaddress >> 8)); // MSB
-  Wire.send((int)(eeaddress & 0xFF)); // LSB
-  Wire.send(rdata);
-  Wire.endTransmission();
-  Alarm.delay(11); // give the eeprom time to finish one write before issuing another one. Value was obtained from the datasheet.
-  
-}
-
-byte i2c_eeprom_read_byte( int deviceaddress, unsigned int eeaddress ) {
-  byte rdata = 0xFF;
-  Wire.beginTransmission(deviceaddress);
-  Wire.send((int)(eeaddress >> 8)); // MSB
-  Wire.send((int)(eeaddress & 0xFF)); // LSB
-  Wire.endTransmission();
-  Wire.requestFrom(deviceaddress,1);
-  if (Wire.available()) rdata = Wire.receive();
-  return rdata;
+  Serial.print(tFrac);
 }
 
