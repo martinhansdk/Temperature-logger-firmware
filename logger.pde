@@ -25,8 +25,8 @@ time_t period = 30;
 AlarmId timer;
 
 // temperature sensors
-DS1621 indoor_sensor  = DS1621((0x90 >> 1) | 1);
-DS1621 outdoor_sensor = DS1621((0x90 >> 1) | 0);
+DS1621 indoor_sensor  = DS1621((0x90 >> 1) | 0);
+DS1621 outdoor_sensor = DS1621((0x90 >> 1) | 1);
 
 // prototypes
 void sample_and_store();
