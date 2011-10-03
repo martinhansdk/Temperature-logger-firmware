@@ -30,7 +30,7 @@ DS1621 outdoor_sensor = DS1621((0x90 >> 1) | 1);
 
 // prototypes
 void sample_and_store();
-void greenLEDoff();
+void greenLEDon();
 void messageCompleted();
 void print_status();
 int truncate_temp(int tC);
@@ -39,7 +39,9 @@ void print_hr_temperature(int tC);
 
 // Create an EDB object with the appropriate write and read handlers
 // Each eeprom has space for 32768 bytes, we've got 4 of them 
-#define TABLE_SIZE 32768*4
+
+// FIXME, workaround, one of the eeproms doesn't work
+#define TABLE_SIZE 32768*3
 EDB db(&EEwriter, &EEreader);
 EDB_Status last_db_status = EDB_Status(100);
 
@@ -106,9 +108,9 @@ void sample_and_store () {
 
   last_db_status=db.appendRec(EDB_REC logEvent.pack()); 
   
-  // turn green led on for one second to show sampling happened
-  digitalWrite(greenLEDPin, HIGH);
-  Alarm.timerOnce(1, greenLEDoff);
+  // turn green led off for one second to show sampling happened
+  digitalWrite(greenLEDPin, LOW);
+  Alarm.timerOnce(1, greenLEDon);
   
   // show database status on red led
   if(last_db_status==EDB_OK)
@@ -117,8 +119,8 @@ void sample_and_store () {
     digitalWrite(redLEDPin, HIGH);
 }
 
-void greenLEDoff () {
-   digitalWrite(greenLEDPin, LOW);
+void greenLEDon () {
+   digitalWrite(greenLEDPin, HIGH);
 }
 
 // Define messenger function
@@ -141,10 +143,12 @@ void messageCompleted() {
     } else if ( message.checkString("start") ) {
       Alarm.enable(timer);
       running=1;
+      digitalWrite(greenLEDPin, HIGH);
       Serial.println("OK");      
     } else if ( message.checkString("stop") ) {
       Alarm.disable(timer);
       running=0;
+      digitalWrite(greenLEDPin, LOW);
       Serial.println("OK");
     } else if ( message.checkString("setperiod") ) {      
       period = message.readLong();

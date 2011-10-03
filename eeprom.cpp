@@ -32,6 +32,9 @@ void EEwriter(unsigned long address, uint8_t data)
   int deviceaddress;
   
   deviceaddress=0x50 + (address/32768);
+
+  if(deviceaddress > 0x50) deviceaddress++; // FIXME, workaround eeprom with address 0x51 doesn't work
+
   address=address % 32768;
         
   i2c_eeprom_write_byte( deviceaddress, address, data );
@@ -42,6 +45,9 @@ uint8_t EEreader(unsigned long address)
   int deviceaddress;
       
   deviceaddress=0x50 + (address/32768);
+
+  if(deviceaddress > 0x50) deviceaddress++; // FIXME, workaround eeprom with address 0x51 doesn't work
+
   address=address % 32768;
       
   return i2c_eeprom_read_byte( deviceaddress, address );
